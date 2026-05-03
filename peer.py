@@ -108,12 +108,15 @@ class Peer:
         self.role = "server" if is_server else "client"
         self.peer_role = "client" if is_server else "server"
 
-        # Make sure our identity exists. Peer's pubkey is loaded later, after connect.
         self.signing_key = load_or_create_identity(self.role)
 
     # ----- connection lifecycle -----
 
     def start(self):
+        # Load peer's long-term public key FIRST, so a missing-key error fires
+        # immediately instead of hiding behind a blocking TCP connect/accept.
+        self.peer_verify_key = load_peer_public(self.peer_role)
+
         if self.is_server:
             self.sock.bind((self.host, self.port))
             self.sock.listen(1)
@@ -125,7 +128,6 @@ class Peer:
             self.sock.connect((self.host, self.port))
             self.conn = self.sock
 
-        self.peer_verify_key = load_peer_public(self.peer_role)
         self._handshake()
         self._chat_forever()
 
