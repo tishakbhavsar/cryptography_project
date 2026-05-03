@@ -16,5 +16,4 @@ venv/
 
 # Long-term ECDSA identity keys are auto-generated on first run.
 # Public keys are safe to share, but private keys must NEVER be committed.
-# Skipping the whole dir is the simplest and safest rule.
 keys/
