@@ -1,9 +1,20 @@
+# Python
 __pycache__/
 *.pyc
+*.pyo
+
+# Virtual env
 .venv/
+venv/
+
+# OS / editor / Jupyter junk
 .DS_Store
 .ipynb_checkpoints/
 
+# Claude Code local settings
+.claude/
+
 # Long-term ECDSA identity keys are auto-generated on first run.
-# Private keys must never be committed; skipping the whole dir is simplest.
-Only payload (PyCA)/keys/
+# Public keys are safe to share, but private keys must NEVER be committed.
+# Skipping the whole dir is the simplest and safest rule.
+keys/
