@@ -262,29 +262,6 @@ It's worth being honest about which security properties hold and which don't, be
 
 **Threats explicitly outside scope.** Endpoint compromise (keylogger, malware on either machine), physical access to either `keys/*_priv.pem`, social-engineering during the public-key swap (someone tricks you into accepting their pubkey instead of your peer's — no PKI here, the trust is "I copied this file from you in person"), traffic analysis (an observer learns *that* you're chatting and roughly *how much*, even without learning *what*), and denial-of-service (anyone can drop your TCP connection). None of these are problems the assignment asks us to solve.
 
-## Mapping back to the assignment
-
-All the relevant code is in `Using Library of PyCA/02 Messenger (Handshaking)/Server/peer.py` (the `Client/peer.py` is an identical copy).
-
-| Assignment requirement | Where it lives in `peer.py` |
-|---|---|
-| ECDH key agreement | `_handshake()` (`ec.generate_private_key` + `eph_priv.exchange`) |
-| ECDSA authentication of the DH | also `_handshake()` (`signing_key.sign` and `peer_verify_key.verify`) |
-| Encrypt-then-MAC | `encrypt_then_mac()` and `verify_then_decrypt()` |
-| AES-128-CBC | `Cipher(algorithms.AES(send_enc), modes.CBC(iv))` |
-| HMAC-SHA256 | `hmac.HMAC(send_mac, hashes.SHA256())` |
-
-## Things that go wrong and how to fix them
-
-**`Connection refused`** — there's no server listening on that address/port. Either the server isn't running, or you're connecting to the wrong IP. Use whatever IP the server printed under `[INFO] Detected IP:`.
-
-**`Peer public key not found: keys/<role>_pub.pem`** — you don't have the other side's public key on this machine yet. See the cross-machine section above.
-
-**`InvalidSignature` during handshake** — the public key you have on file for the peer doesn't match the private key the peer is actually signing with. Usually this means an out-of-date copy: re-do the public-key swap.
-
-**`ModuleNotFoundError: cryptography`** — the venv isn't active in this terminal. Run `source .venv/bin/activate` and try again.
-
-**Hangs at "Connecting..."** — TCP can't reach the destination at all. `ping <server ip>` to confirm. If ping fails, you're on different networks. Same Wi-Fi or a hotspot will fix it.
 
 ## CLI reference
 
@@ -292,10 +269,10 @@ From `Using Library of PyCA/02 Messenger (Handshaking)/Server/`:
 ```
 python alt_run_server.py
 ```
-Always binds to the machine's detected LAN IP on port `5002`. No arguments needed.
+
 
 From `Using Library of PyCA/02 Messenger (Handshaking)/Client/`:
 ```
 python alt_run_client.py client <server_ip>
 ```
-The literal word `client` is required (the script checks for it); `<server_ip>` is whatever IP the server printed.
+
