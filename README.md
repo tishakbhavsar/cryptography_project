@@ -7,13 +7,20 @@ This is the assignment from the cryptography course: take an existing plaintext 
 ## What's in here
 
 ```
-peer.py          the Peer class - sockets, the handshake, encryption helpers
-messenger.py     CLI: python messenger.py server | client <host>
-tamper_test.py   a quick sanity check that flipping a bit gets rejected
-keys/            generated automatically the first time you run anything
+Using Library of PyCA/
+├── 01 Messenger (only payload)/         the original plaintext starter (no crypto)
+│   ├── Server/  peer.py + alt_run_server.py
+│   └── Client/  peer.py + alt_run_client.py
+└── 02 Messenger (Handshaking)/          the version with our crypto plugged in
+    ├── Server/  peer.py + alt_run_server.py
+    └── Client/  peer.py + alt_run_client.py
 ```
 
-`keys/` is gitignored. Public keys can be shared (that's how the two sides know who to trust); private keys never leave the machine that made them.
+`peer.py` in the `02 Messenger (Handshaking)` folders contains the full crypto: signed-ECDH handshake, AES-128-CBC + HMAC-SHA256 record layer, length-prefixed framing. Server and Client copies are identical — same file, two locations, just to keep the original starter layout.
+
+The `alt_run_*.py` scripts are tiny entry points that figure out the local IP and instantiate a `Peer`.
+
+When you first run the messenger, it auto-creates a `keys/` folder inside `02 Messenger (Handshaking)/` for the long-term ECDSA identity files. `keys/` is gitignored. Public keys can be shared (that's how the two sides know who to trust); private keys never leave the machine that made them.
 
 ## Setup
 
@@ -29,21 +36,27 @@ That's the whole installation. Activate the venv (`source .venv/bin/activate`) e
 
 ## Running it on one machine
 
-Open two terminals. In both of them, activate the venv and `cd` into the project.
+Open two terminals. In both, activate the venv.
 
 Terminal 1 (server):
 ```bash
-python messenger.py server 127.0.0.1
+cd "Using Library of PyCA/02 Messenger (Handshaking)/Server"
+python alt_run_server.py
 ```
+
+It will print something like `[INFO] Detected IP: 10.1.57.116`. **Note that IP** — the client needs it.
 
 Terminal 2 (client):
 ```bash
-python messenger.py client 127.0.0.1
+cd "Using Library of PyCA/02 Messenger (Handshaking)/Client"
+python alt_run_client.py client 10.1.57.116        # use the IP the server printed
 ```
 
-Both should print `Handshake complete: peer authenticated, session keys established.` and you can start typing. Type `exit` (or just close the terminal) to quit.
+Both sides should print `Handshake complete: peer authenticated, session keys established.` and you can start typing. Type `exit` (or close the terminal) to quit.
 
-The first time you run anything, the program creates `keys/server_priv.pem`, `keys/server_pub.pem`, `keys/client_priv.pem`, and `keys/client_pub.pem` for you. After that it just loads them.
+The first time you run anything, the program creates `keys/server_priv.pem`, `keys/server_pub.pem`, `keys/client_priv.pem`, and `keys/client_pub.pem` inside `02 Messenger (Handshaking)/keys/`. After that it just loads them.
+
+> Note: `alt_run_server.py` always binds to the machine's detected LAN IP, not loopback. So even on one machine, the client must connect to that detected IP rather than `127.0.0.1`.
 
 ## Running it across two machines
 
@@ -51,51 +64,35 @@ The same code runs on two different computers. The TCP socket doesn't care; the 
 
 The two machines have to be reachable to each other on the network. Easiest is being on the same Wi-Fi or sharing a phone hotspot. Different Wi-Fi networks (or campus networks with client isolation turned on) won't work without something like Tailscale or a port-forwarded router, which is a separate problem.
 
-Say one of you (Alice) is going to be the server, and the other (Bob) is the client.
+Say one of you (Alice) is going to be the server, and the other (Bob) is the client. Both of you have the project cloned and the venv set up.
 
-1. Both of you do the setup above (`venv`, `pip install cryptography`).
-
-2. On Alice's machine, start the server once. It generates Alice's keypair and starts listening:
+1. **On Alice's machine**, start the server. It generates Alice's keypair and starts listening:
    ```bash
-   python messenger.py server
+   cd "Using Library of PyCA/02 Messenger (Handshaking)/Server"
+   python alt_run_server.py
    ```
-   Note the IP it prints — that's what Bob is going to connect to. You can leave the server running, or stop it for now (Ctrl-C) and start it again later.
+   Note the IP it prints — that's what Bob is going to connect to. You can leave the server running.
 
-3. On Bob's machine, try the client once. It'll fail with a "peer public key not found" error, but along the way it generates Bob's keypair:
+2. **On Bob's machine**, try the client once. It'll fail with a "peer public key not found" error, but along the way it generates Bob's keypair:
    ```bash
-   python messenger.py client <alice's ip>
+   cd "Using Library of PyCA/02 Messenger (Handshaking)/Client"
+   python alt_run_client.py client <alice's ip>
    ```
 
-4. Now swap the public keys. Alice sends Bob her `keys/server_pub.pem`; Bob sends Alice his `keys/client_pub.pem`. AirDrop, email, Slack, USB stick — whatever. **Do not send the `_priv.pem` files.** Each side drops the file they received into their own `keys/` folder.
+3. **Swap the public keys.** Alice sends Bob her `02 Messenger (Handshaking)/keys/server_pub.pem`; Bob sends Alice his `02 Messenger (Handshaking)/keys/client_pub.pem`. AirDrop, email, Slack, USB stick — whatever. **Do not send the `_priv.pem` files.** Each side drops the received file into their own `02 Messenger (Handshaking)/keys/` folder.
 
-5. Now it works:
+4. **Now it works:**
    ```bash
    # on Alice
-   python messenger.py server
+   cd "Using Library of PyCA/02 Messenger (Handshaking)/Server"
+   python alt_run_server.py
 
    # on Bob
-   python messenger.py client <alice's ip>
+   cd "Using Library of PyCA/02 Messenger (Handshaking)/Client"
+   python alt_run_client.py client <alice's ip>
    ```
 
 If `ping <alice's ip>` from Bob's machine times out or says "no route to host," the network is the problem, not the program. Check you're really on the same Wi-Fi (same SSID, same first three numbers of the IP), or fall back to a phone hotspot.
-
-## Quick demo that the crypto actually works
-
-After running the messenger at least once (so the keys exist):
-
-```bash
-python tamper_test.py
-```
-
-This spins up both peers in one process, completes a real handshake, then sends three messages: one normal, one with a flipped bit in the MAC tag, one with a flipped bit in the ciphertext. Output should be:
-
-```
-[ok] honest message decrypted -> b'hello server'
-[ok] tampered tag rejected -> InvalidSignature: Signature did not match digest.
-[ok] tampered ciphertext rejected -> InvalidSignature: Signature did not match digest.
-```
-
-The two rejections are the whole point of encrypt-then-MAC: the receiver checks the HMAC tag first, and only decrypts if it matches. Any change to the IV, the ciphertext, or the tag itself fails that check, and the AES decryption never runs.
 
 ## How the crypto fits together
 
@@ -240,7 +237,7 @@ It's worth being honest about which security properties hold and which don't, be
 
 **Confidentiality of chat messages.** Yes. AES-128-CBC under a key that only the two parties know. Anyone passively recording the wire sees `IV ‖ C ‖ T`, all of which look uniformly random. Without the encryption key, recovering $P$ requires breaking AES-128.
 
-**Integrity of chat messages.** Yes. The HMAC-SHA256 tag covers both the IV and the ciphertext, so any single-bit flip anywhere in the record causes the tag check to fail. The receiver aborts before decrypting; the tampered message is dropped. The `tamper_test.py` script demonstrates exactly this.
+**Integrity of chat messages.** Yes. The HMAC-SHA256 tag covers both the IV and the ciphertext, so any single-bit flip anywhere in the record causes the tag check to fail. The receiver aborts before decrypting; the tampered message is dropped.
 
 **Authentication of the channel.** Yes. The handshake signs each ephemeral DH public key with the long-term ECDSA key, and the peer verifies with a public key it already trusts (from the manual key swap). A man-in-the-middle who tries to substitute their own ephemeral DH value can't produce a valid signature, so the handshake aborts. Once the handshake completes, both sides know they're talking to whoever owns the long-term ECDSA private keys they exchanged offline.
 
@@ -265,3 +262,40 @@ It's worth being honest about which security properties hold and which don't, be
 
 **Threats explicitly outside scope.** Endpoint compromise (keylogger, malware on either machine), physical access to either `keys/*_priv.pem`, social-engineering during the public-key swap (someone tricks you into accepting their pubkey instead of your peer's — no PKI here, the trust is "I copied this file from you in person"), traffic analysis (an observer learns *that* you're chatting and roughly *how much*, even without learning *what*), and denial-of-service (anyone can drop your TCP connection). None of these are problems the assignment asks us to solve.
 
+## Mapping back to the assignment
+
+All the relevant code is in `Using Library of PyCA/02 Messenger (Handshaking)/Server/peer.py` (the `Client/peer.py` is an identical copy).
+
+| Assignment requirement | Where it lives in `peer.py` |
+|---|---|
+| ECDH key agreement | `_handshake()` (`ec.generate_private_key` + `eph_priv.exchange`) |
+| ECDSA authentication of the DH | also `_handshake()` (`signing_key.sign` and `peer_verify_key.verify`) |
+| Encrypt-then-MAC | `encrypt_then_mac()` and `verify_then_decrypt()` |
+| AES-128-CBC | `Cipher(algorithms.AES(send_enc), modes.CBC(iv))` |
+| HMAC-SHA256 | `hmac.HMAC(send_mac, hashes.SHA256())` |
+
+## Things that go wrong and how to fix them
+
+**`Connection refused`** — there's no server listening on that address/port. Either the server isn't running, or you're connecting to the wrong IP. Use whatever IP the server printed under `[INFO] Detected IP:`.
+
+**`Peer public key not found: keys/<role>_pub.pem`** — you don't have the other side's public key on this machine yet. See the cross-machine section above.
+
+**`InvalidSignature` during handshake** — the public key you have on file for the peer doesn't match the private key the peer is actually signing with. Usually this means an out-of-date copy: re-do the public-key swap.
+
+**`ModuleNotFoundError: cryptography`** — the venv isn't active in this terminal. Run `source .venv/bin/activate` and try again.
+
+**Hangs at "Connecting..."** — TCP can't reach the destination at all. `ping <server ip>` to confirm. If ping fails, you're on different networks. Same Wi-Fi or a hotspot will fix it.
+
+## CLI reference
+
+From `Using Library of PyCA/02 Messenger (Handshaking)/Server/`:
+```
+python alt_run_server.py
+```
+Always binds to the machine's detected LAN IP on port `5002`. No arguments needed.
+
+From `Using Library of PyCA/02 Messenger (Handshaking)/Client/`:
+```
+python alt_run_client.py client <server_ip>
+```
+The literal word `client` is required (the script checks for it); `<server_ip>` is whatever IP the server printed.
