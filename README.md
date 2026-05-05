@@ -94,6 +94,45 @@ Say one of you (Alice) is going to be the server, and the other (Bob) is the cli
 
 If `ping <alice's ip>` from Bob's machine times out or says "no route to host," the network is the problem, not the program. Check you're really on the same Wi-Fi (same SSID, same first three numbers of the IP), or fall back to a phone hotspot.
 
+## Running it over Tailscale (different networks)
+
+If the two machines are on different Wi-Fi networks, a campus network with client isolation, or anywhere a direct LAN connection isn't possible, Tailscale gives you a private overlay network where each device gets a stable `100.x.x.x` IP that works regardless of which real network you're on.
+
+### One-time setup
+
+1. Install Tailscale on both machines: https://tailscale.com/download
+2. On each machine, sign in with the same Tailscale account (or the same tailnet):
+   ```bash
+   tailscale up
+   ```
+3. Confirm connectivity — from either machine, ping the other using its Tailscale IP:
+   ```bash
+   tailscale ip          # see your own Tailscale IP
+   ping 100.x.x.x        # ping the other machine's Tailscale IP
+   ```
+
+### Running the messenger over Tailscale
+
+The server must bind to all interfaces (`0.0.0.0`) instead of the auto-detected LAN IP, so it accepts connections arriving on the Tailscale interface. Use `alt_run_server_tailscale.py` for this:
+
+**On the server machine:**
+```bash
+cd "Using Library of PyCA/02 Messenger (Handshaking)/Server"
+python alt_run_server_tailscale.py server
+```
+
+It will print your detected LAN IP, but what matters for the client is your **Tailscale IP** (run `tailscale ip` to find it).
+
+**On the client machine:**
+```bash
+cd "Using Library of PyCA/02 Messenger (Handshaking)/Client"
+python alt_run_client.py client 100.x.x.x    # use the server's Tailscale IP
+```
+
+Everything else (key exchange, the handshake, chatting) is identical to the local-network case. The TCP connection just travels through the Tailscale tunnel instead of your LAN.
+
+> You still need to swap public keys the same way — Tailscale only handles the network layer. Trust ("who am I talking to?") is still anchored by the ECDSA keypairs in `keys/`.
+
 ## How the crypto fits together
 
 When the TCP connection opens, before any chat traffic, the two sides run a handshake:
